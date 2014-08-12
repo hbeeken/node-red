@@ -16,6 +16,8 @@
 
 module.exports = function(RED) {
     "use strict";
+    var csv = require('fast-csv');
+    
     function CSVNode(n) {
         RED.nodes.createNode(this,n);
         this.template = n.temp.split(",");
@@ -25,51 +27,26 @@ module.exports = function(RED) {
         var node = this;
         this.on("input", function(msg) {
             if (msg.hasOwnProperty("payload")) {
-                if (typeof msg.payload == "object") { // convert to csv
-                    try {
-                        var ou = "";
-                        for (var t in node.template) {
-                            if (msg.payload.hasOwnProperty(node.template[t])) {
-                                if (msg.payload[node.template[t]].indexOf(node.sep) != -1) {
-                                    ou += node.quo + msg.payload[node.template[t]] + node.quo + node.sep;
-                                }
-                                else if (msg.payload[node.template[t]].indexOf(node.quo) != -1) {
-                                    msg.payload[node.template[t]] = msg.payload[node.template[t]].replace(/"/g, '""');
-                                    ou += node.quo + msg.payload[node.template[t]] + node.quo + node.sep;
-                                }
-                                else { ou += msg.payload[node.template[t]] + node.sep; }
-                            }
-                        }
-                        msg.payload = ou.slice(0,-1);
-                        node.send(msg);
-                    }
-                    catch(e) { node.log(e); }
+                if (typeof msg.payload == "object") { //convert to csv
+                    //csv.writetoString()
+                    node.send(msg);
                 }
-                else if (typeof msg.payload == "string") { // convert to object
-                    try {
-                        var f = true;
-                        var j = 0;
-                        var k = [""];
-                        var o = {};
-                        for (var i = 0; i < msg.payload.length; i++) {
-                            if (msg.payload[i] === node.quo) {
-                                f = !f;
-                                if (msg.payload[i-1] === node.quo) { k[j] += '\"'; }
-                            }
-                            else if ((msg.payload[i] === node.sep) && f) {
-                                if ( node.template[j] && (node.template[j] !== "") ) { o[node.template[j]] = k[j]; }
-                                j += 1;
-                                k[j] = "";
-                            }
-                            else {
-                                k[j] += msg.payload[i];
-                            }
-                        }
-                        if ( node.template[j] && (node.template[j] !== "") ) { o[node.template[j]] = k[j]; }
-                        msg.payload = o;
+                else if (typeof msg.payload == "string") { //convert csv string to js
+                    var obj = {};
+                    var row = 0;
+                    // assume first row are the headers
+                    csv.fromString(msg.payload, {headers:true}).on ("record", function(data){
+                        console.log("row " + row + " = " + data);
+                        console.log(data);
+                        obj[row] = data;
+                        console.log("-----------");
+                        row++;
+                    }).on("end", function(data) {
+                        console.log("data: " + data);
+                        console.log("done");
+                        msg.payload = obj;
                         node.send(msg);
-                    }
-                    catch(e) { node.log(e); }
+                    });
                 }
                 else { node.log("This node only handles csv strings or js objects."); }
             }
