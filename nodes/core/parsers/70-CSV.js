@@ -20,29 +20,47 @@ module.exports = function(RED) {
     
     function CSVNode(n) {
         RED.nodes.createNode(this,n);
-        this.template = n.temp.split(",");
-        this.sep = n.sep || ',';
-        this.sep = this.sep.replace("\\n","\n").replace("\\r","\r").replace("\\t","\t");
-        this.quo = '"';
         var node = this;
         this.on("input", function(msg) {
             if (msg.hasOwnProperty("payload")) {
                 if (typeof msg.payload == "object") { //convert to csv
-                    //csv.writetoString()
-                    node.send(msg);
+                    if (msg.payload instanceof Array) {
+                        console.log("msg.payload instanceof Array");
+                        console.log(msg.payload);
+                        var columns;
+                        if (n.temp) {
+                            columns = n.temp;
+                        } else {
+                            // assume first row are the headers
+                            columns = true;
+                        }
+                        console.log(n.temp);
+                        var csvString = csv.writeToString(msg.payload, {headers:columns});
+                        console.log(csvString);
+                        msg.payload = csvString;
+                        node.send(msg);
+                    }
                 }
                 else if (typeof msg.payload == "string") { //convert csv string to js
+                    console.log("converting to a js object");
+                    console.log(msg.payload);
                     var obj = {};
                     var row = 0;
-                    // assume first row are the headers
-                    csv.fromString(msg.payload, {headers:true}).on ("record", function(data){
+                    
+                    var columns;
+                    if (n.temp) {
+                        columns = n.temp;
+                    } else {
+                        // assume first row are the headers
+                        columns = true;
+                    }
+                    csv.fromString(msg.payload, {headers:columns}).on ("record", function(data){
                         console.log("row " + row + " = " + data);
                         console.log(data);
                         obj[row] = data;
                         console.log("-----------");
                         row++;
-                    }).on("end", function(data) {
-                        console.log("data: " + data);
+                    }).on("end", function() {
                         console.log("done");
                         msg.payload = obj;
                         node.send(msg);
